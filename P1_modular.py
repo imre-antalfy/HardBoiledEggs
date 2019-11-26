@@ -1,101 +1,104 @@
 # -*- coding: utf-8 -*-
 
 ############################################################
-# 00 - exception handling
-# defining the class Input error, when malformed input occurs ind the 
-# read file occurs
-############################################################
+### 00 - exception handling
     
 class Error(Exception):
-#    Base class for exceptions in this module.
+    """ Base class for exceptions in this module.
+    """
     pass
     
 class InputError(Error):
-#    Exception raised for errors in the input.
-#
-#    Attributes:
-#        expression -- input expression in which the error occurred
-#        message -- explanation of the error  
-
+    """Exception raised for errors in the input.
+    Attributes:
+        expression -- input expression in which the error occurred
+        message -- explanation of the error  
+    """
     def __init__(self, expression, message):
         self.expression = expression
         self.message = message
     
 ############################################################
-# O1 - file handling
-# functions to read input, tidy it and process input, line by line
-############################################################
+### O1 - file handling
 
-###
-# Read file - function
+
 def rSeqFile(FilePath):
+    """Read file
+    returns read file as string
+    """
     f=open(FilePath, 'r')
     #check if file open
     if f.mode == 'r': 
         return(f.read())
 
-###
-# Tidying data - function
-# preparation for process
-# del leading whitespace before labels, empty lines and >
-def TidySeqs(SeqFile):
-    #split by lines
+def TidyLines(SeqFile):
+    """ Tidying Lines
+    preparation for process, del empty lines, split lines
+    returns list of lines
+    """
     TSeqs = SeqFile.splitlines() 
-    #remove empty rows
     TSeqs = list(filter(None,TSeqs))
-    return(TSeqs)
+    return(TSeqs)  
 
-###
-# concatonating sequences - function
-# the whole sequence will be stored in Line[1]
-def ConcatSeqs(Line):
-    for element in Line[2:]:
-        Line[1] += str(element)
+def CheckLabel(Line): 
+    """ Checking space before label
+    only whitespace allowed, no tabs
+    """           
+    for i in Line:
+        if i == '\t': #can't detect leading tabs, stops at the first \ 
+            raise InputError(Line,"malformed input") 
+        elif i != ' ':
+            break
 
-###
-#Processing Line - function
-def ProcessLine(TidyLine):
-    #remove > and strip leading whitespace. 
-    #lstrip doesnt work with > infront
-    PLine = TidyLine.replace('>','')
-    PLine = PLine.split()
-    #Concat call, if sequence is split
-    ConcatSeqs(PLine)
-    #check for malformed sequence
-    CheckSeq(PLine[1])
-    return( PLine[0],PLine[1] )
-    
-
-############################################################   
-# Exception handling - function
-# check, if sequence only contains A,C,G,T
 def CheckSeq(Seq):
-    ok_genoms = {"A", "C", "G", "T"}
-    genom_diff = ok_genoms.symmetric_difference(Seq)
-    # raise error if the diff is anything else in Seq than A,C,T,G
-    if not genom_diff.issubset(ok_genoms):
-        raise InputError(Seq,"malformed input")
+    """ Checking seq
+    only allowed chars in Seq are A,C,G,T. if Seq differs, raise an error
+    """
+    OkNucleo = ("A", "C", "G", "T")
+    for i in Seq:
+        if i not in OkNucleo:
+            raise InputError(Seq,"malformed input")          
     
+def ProcessLine(TidyLine):
+    """ Processing Line
+    function to process one line by itself, remove >, split by whistespace, 
+    concatonate sequence from splits, stroring sequence in PLine[1]
+    raise error if no >, only one string in line or seq is violated
+    return label and seq
+    """
+    if not TidyLine.startswith('>'):
+        raise InputError(TidyLine,"malformed input")   
+        
+    PLine = TidyLine.replace('>','')   
+    CheckLabel(PLine)
+    PLine = PLine.split()
+    
+    try:
+        for element in PLine[2:]:     
+            PLine[1] += "".join(element)       
+        CheckSeq(PLine[1])   
+        return( PLine[0],PLine[1] ) #Line[0] = Label, Line[1] = Seq
+    except IndexError:
+        raise InputError(PLine,"malformed input") 
+        
+
 ############################################################
-### Main function
+### 02 - Main function
 
 def ParseSeqFile(SeqFile):
-    
-    #tidy the data
-    TidyFile = TidySeqs(SeqFile)
+    """ parse file and load into list[tuple(string,string)]
+    """
+    TidyFile = TidyLines(SeqFile)
     
     result = []
 
-    #load processed seqs into tuple
     for line in TidyFile:
         t = ( ProcessLine(line) )
         result.append(t)
-    print(result)
+    return(result)
 
 ############################################################
-### Read the file - call 
+### 03 - Read the file - call 
   
-ParseSeqFile( rSeqFile("sequence.txt") )
-
-
+print( ParseSeqFile( rSeqFile("sequence.txt") ) )
 
