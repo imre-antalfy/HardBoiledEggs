@@ -53,7 +53,7 @@ if all_seqs.count(">") > 1:
                 
             elif all_seqs[1].isspace():
                 #delete whitespace before label
-                all_seqs = all_seqs[0 : 1 : ] + all_seqs[2 :  : ]
+                all_seqs = all_seqs[0] + all_seqs[2 : ]
             
             #EH: never finding a label
             else:
