@@ -31,3 +31,8 @@ for i in oops:
 print(oops)
 
 oops[1]
+
+data = [1,1,1,3]
+
+for i in range(len(data)):
+    print(i)
