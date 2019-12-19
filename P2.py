@@ -9,13 +9,8 @@ import numpy as np
 import pandas as pd
 from collections import defaultdict
 
-
-P1 = [('Mouse', 'AAACATCCAAACACCAACCCCAG'),
- ('Bovine', 'ACCAAACCTGTCCCCATCTAACACCA'),
- ('Gibbon', 'AATACCCAACTCGACCTACACCAA')]
-
-######################################
-### functions
+############################################################
+### 00 - input check
 
 def CheckInput(Input):
     """ Check if input is list(tuple(string,string)))
@@ -31,14 +26,14 @@ def CheckInput(Input):
             if type(value) != str:
                 raise Exception(value, "malformed input")
                 
-########################################
-### matrix setup function
+############################################################
+### 01 - matrix setup functions
                 
-def SetupDynamicMatrix(n_cols, n_rows, penalty):
-    """ # open dynamic programming matrix
-        # empty integer matrix
-        # this keeps track of the score
-        # already calculates starting distances
+def CreateDynamicMatrix(n_cols, n_rows, penalty):
+    """  Dynamic programming matrix
+    integer matrix, keeping track of the evolutionary score
+    penalty scores in first row & colum calculated, otherwise empty
+    return matrix
     """
     Matrix = np.zeros(shape=(n_rows,n_cols), dtype=np.int)
  
@@ -51,8 +46,11 @@ def SetupDynamicMatrix(n_cols, n_rows, penalty):
     
     return(Matrix)
 
-def SetupTracebackMatrix(n_cols, n_rows):
-    """
+def CreateTracebackMatrix(n_cols, n_rows):
+    """ Traceback matrix
+    String matrix, keeping track of the decision taken by the calculation
+    the first row and column are prefilled, as the decision is always the same
+    return matrix
     """
     Matrix = np.full(shape=(n_rows, n_cols), fill_value=" ", dtype=np.str)
     
@@ -65,15 +63,19 @@ def SetupTracebackMatrix(n_cols, n_rows):
     
     return(Matrix)
     
-    
-### calculation functions
+############################################################
+### 02 - calculation/update functions
     
 def WriteTraceback(traceback_matrix, current_cell, result_list, 
                    index_row, index_col):
-    """
+    """ Filling Traceback matrix
+    from result list, first list entry is instertion, 2nd gaprow, 3d gapcol
+    "↖" = case insertion
+    "↑" = case gap row
+    "←" = case gap columm 
     """
     if current_cell == result_list[0]: # case insertion
-        traceback_matrix[index_row][index_col] = '↖' 
+        traceback_matrix[index_row][index_col] = "↖" 
         
     elif current_cell == result_list[1]: # case gap row
         traceback_matrix[index_row][index_col] =  "↑"
@@ -84,7 +86,17 @@ def WriteTraceback(traceback_matrix, current_cell, result_list,
 
 def FillMatrices(dynamic_matrix, traceback_matrix, substitution_matrix, 
                  n_rows, n_cols, seq1, seq2, penalty):
-    """ 
+    """ Calculation of dynamic score and traceback function call
+    evolutionary score calculation of M[i][j]
+    three possibilities, take maximum the three calculations,
+    insertion:
+        M[i-1][j-1] + S[ci][cj] (c = char of current sequence)
+    gap in row:
+        M[i-1][j] - penalty
+    gap in col:
+        M[1][j-1] - penalty
+        
+    traceback matrix call per cell, with current index and value
     """
     i = 1 # row
     while i < n_rows:
@@ -102,20 +114,24 @@ def FillMatrices(dynamic_matrix, traceback_matrix, substitution_matrix,
             colgap_score = dynamic_matrix[i][j-1] - penalty
             result.append(colgap_score) 
             
-            # write maxresult
             max_value = max(result)
             dynamic_matrix[i][j] = max_value
             
-            # write traceback
             WriteTraceback(traceback_matrix, max_value, result, i, j)
             
             j += 1
-        i += 1    
- 
-### traceback functions    
+        i += 1 
+
+############################################################
+### 03 - traceback function  
         
 def Traceback(seq1, seq2, traceback_matrix):
-    """
+    """ Trace back decision from evolutionary calculation
+    starting from max row and max column, until "•" is found ("•" is in [0][0])
+    '↖' = writing the current char from each sequence into according result
+    "←" = aligned seq1 gets current char, aligned seq2 gets '-'
+    else =  aligned seq2 gets current char, aligned seq1 gets '-'
+    after writing jump to the next cell, according to decision
     """          
     i = len(seq2)
     j = len(seq1)
@@ -126,73 +142,88 @@ def Traceback(seq1, seq2, traceback_matrix):
     while traceback_matrix[i][j] != "•":
         
         if traceback_matrix[i][j] == '↖' :            
-            # write from both sequences
             result_seq1 = "".join((seq1[j-1], result_seq1))
             result_seq2 = "".join((seq2[i-1], result_seq2))            
-            # jump
             i -= 1
             j -= 1        
             
         elif traceback_matrix[i][j] == "←" :            
-            # write only from horizontal sequence, insert - into vertical
             result_seq1 = "".join((seq1[j-1], result_seq1))
             result_seq2 = "".join(('-', result_seq2))              
-            # jump
             j -= 1
             
         else:    
-            # write only from vertical sequence, insert - into horizontal
             result_seq1 = "".join(('-', result_seq1))
             result_seq2 = "".join((seq2[i-1], result_seq2))       
-            # jump
             i -= 1
+            
     return(result_seq1,result_seq2)
-        
+ 
+############################################################
+### 04 - substitution matrix from literature
+
+def CreateSubMatrix():
+    """ Substitution matrix
+    Panda datastructure. the calculation process can directly access 
+    nucleotides combination in the panda index
+    Based on literature for scoring scheme:
+    same nucleotide = 5, indel = -2
+    return matrix
+    """
+    nucleotides = ['A','C','G','T']
+    rating =    {'A': [5,-2,-2,-2],
+                'C': [-2,5,-2,-2],
+                'G':  [-2,-2,5,-2],
+                'T':  [-2,-2,-2,5]}
+    
+    S = pd.DataFrame(rating, index=nucleotides)
+    return(S)
+
 ######################################
-### substitution matrix from literature
-
-# now we need substitution matrix
-# open blosum 50 matrix (i need to make that nice with the matrix stuff)
-# i only need the blosum50 values for ACTG, from literature
-nucleotides = ['A','C','G','T']
-rating =    {'A': [5,-2,-2,-2],
-            'C': [-2,5,-2,-2],
-            'G':  [-2,-2,5,-2],
-            'T':  [-2,-2,-2,5]}
-
-S = pd.DataFrame(rating, index=nucleotides)
-
-######################################
-### Main function - per sequence couple
+### 10 - Main function
 
 def AlignByDP(Input):
+    """ Align sequence pairs
+    function:
+        takes list(tuple(str,str) as input, containing sequence pairs
+        per pair calculate evolutionary score, store decision
+        traceback the decision and write aligned sequences
+        return the aligned pairs in dict(tuple(int,int) : tuple(str,str)) 
+            with tuple(int,int) being the index of the pair and
+            tuple(str,str)) being the sequence pair
+    scoring:
+        Based on Subsitution matrix and
+        penalty for a gap is 6, based on literature
     """
-    """
+    S = CreateSubMatrix()
+    
     d = defaultdict(dict)
     n = 0
-    while n < len(P1):
+    while n < len(Input):
         m = n + 1
-        while m < len(P1):
-            seq1 = P1[n][1]
-            seq2 = P1[m][1]
+        while m < len(Input):
+            seq1 = Input[n][1]
+            seq2 = Input[m][1]
             
             num_cols = len(seq1) + 1
             num_rows = len(seq2) + 1
             
             penalty = 6
             
-            test = SetupDynamicMatrix(num_cols, num_rows, penalty)
-            tracetest = SetupTracebackMatrix(num_cols, num_rows)
+            D = CreateDynamicMatrix(num_cols, num_rows, penalty)
+            T = CreateTracebackMatrix(num_cols, num_rows)
             
-            FillMatrices(test, tracetest, S, num_rows, num_cols, seq1, seq2, penalty)
+            FillMatrices(D, T, S, num_rows, num_cols, seq1, seq2, penalty)
             
-            seq1_paired, seq2_paired = Traceback(seq1, seq2, tracetest)
+            seq1_paired, seq2_paired = Traceback(seq1, seq2, T)
             
             d[(n+1,m+1)] = (seq1_paired, seq2_paired)
     
             m += 1
         n += 1
-    
-############################################
-### Main Call
-    
+    return(d)
+#    
+#test = [('x','TTCATA'),
+#        ('y','TGCTCGTA')]
+#
+#AlignByDP(test)
