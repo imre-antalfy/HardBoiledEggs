@@ -10,8 +10,6 @@ import P2
 import P3
 import P4
 
-
-
 Parsed = P1.ParseSeqFile("sequence.txt")
 
 Aligned = P2.AlignByDP(Parsed)
@@ -21,3 +19,4 @@ Dist_Mat = P3.ComputeDistMatrix(Aligned)
 labels = ['Mouse','Bovine','Gibbon','Orangutan','Gorilla','Chimp','Human']
    
 P4.Cluster(Dist_Mat,labels)
+
